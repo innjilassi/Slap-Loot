@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: afcb5f5c7649ed149999aa804fd53fed
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 379452
+  packageName: SceneSwitcher
+  packageVersion: 1.0.0
+  assetPath: Assets/SceneSwitcher/Editor/SceneSwitcher_Manual_EN.pdf
+  uploadId: 914660
