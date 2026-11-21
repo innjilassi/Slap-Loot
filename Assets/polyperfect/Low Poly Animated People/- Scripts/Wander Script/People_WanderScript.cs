@@ -10,5 +10,7 @@ using UnityEditor;
 
 namespace Polyperfect.People
 {
-    public class People_WanderScript : Common_WanderScript { }
+    public class People_WanderScript : Common_WanderScript { 
+        
+    }
 }
