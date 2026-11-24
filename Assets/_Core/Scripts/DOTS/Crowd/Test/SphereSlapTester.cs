@@ -10,50 +10,73 @@ namespace SlapGame
 {
     public class SphereSlapTester : MonoBehaviour
     {
-        public float SlapRadius = 1.5f;
+        [Header("Box Slap Shape")]
+        [Tooltip("Full size of the box in local space (X = width/left-right, Y = height, Z = depth/forward-back).")]
+        public Vector3 SlapBoxSize = new Vector3(2f, 2f, 1.5f);
+
+        [Tooltip("Offset from the slapper's position to the center of the box (local space). " +
+                 "Push Z positive to extend the box forward.")]
+        public Vector3 SlapBoxOffset = new Vector3(0f, 0f, 0.75f);
+
+        [Tooltip("Rotation offset (Euler) applied to the box relative to the slapper's forward.")]
+        public Vector3 SlapBoxRotation = Vector3.zero;
+
         public float SlapDamage = 100f;
         public float SlapForce = 25f;
-        
-        [Header("Directional Slap")]
-        [Tooltip("How wide the slap cone is. 180 = full circle. 90 = only in front.")]
-        [Range(0f, 180f)] 
-        public float SlapAngle = 90f;
+
+        [SerializeField] private SlapSide slapSide;
+        [SerializeField] private SlapperController slapperController;
+
+        [Header("Directional Slap (optional cone filter)")]
+        [Tooltip("How wide the slap cone is. 180 = disabled (full box). 90 = only in front.")]
+        [Range(0f, 180f)]
+        public float SlapAngle = 180f;
 
         [Header("Layers")]
-        public LayerMask HittableLayers; 
+        public LayerMask HittableLayers;
 
         private HashSet<Entity> entitiesInside = new HashSet<Entity>();
 
         void Update()
         {
-            DrawDebugSphere(transform.position, SlapRadius, Color.red);
+            if (!slapperController.GetIsSlapping()) return;
 
             var world = World.DefaultGameObjectInjectionWorld;
             if (world == null || !world.IsCreated) return;
-            
+
             var entityManager = world.EntityManager;
             var physicsWorldQuery = entityManager.CreateEntityQuery(typeof(PhysicsWorldSingleton));
-            if (physicsWorldQuery.IsEmpty) return; 
-            
+            if (physicsWorldQuery.IsEmpty) return;
+
             var physicsWorld = physicsWorldQuery.GetSingleton<PhysicsWorldSingleton>();
-            
-            var sphereCollider = Unity.Physics.SphereCollider.Create(new SphereGeometry
+
+            // --- Build the Box Collider ---
+            var boxGeometry = new BoxGeometry
             {
                 Center = float3.zero,
-                Radius = SlapRadius
-            });
+                Size = (float3)SlapBoxSize,
+                Orientation = quaternion.identity,
+                BevelRadius = 0f
+            };
+            var boxCollider = Unity.Physics.BoxCollider.Create(boxGeometry);
 
             uint collidesWithMask = (uint)HittableLayers.value;
-            sphereCollider.Value.SetCollisionFilter(new CollisionFilter
+            boxCollider.Value.SetCollisionFilter(new CollisionFilter
             {
-                BelongsTo = ~0u, 
-                CollidesWith = collidesWithMask, 
+                BelongsTo = ~0u,
+                CollidesWith = collidesWithMask,
                 GroupIndex = 0
             });
 
-            var input = new ColliderCastInput(sphereCollider, transform.position, transform.position);
+            // --- Build the cast input via the BlobAssetReference overload (no unsafe needed) ---
+            var input = new ColliderCastInput(
+                boxCollider,
+                GetBoxCenter(),
+                GetBoxCenter(),
+                GetBoxRotation()
+            );
+
             NativeList<ColliderCastHit> hits = new NativeList<ColliderCastHit>(Allocator.Temp);
-            
             physicsWorld.CollisionWorld.CastCollider(input, ref hits);
 
             HashSet<Entity> currentFrameHits = new HashSet<Entity>();
@@ -66,23 +89,21 @@ namespace SlapGame
                 {
                     currentFrameHits.Add(hitEntity);
 
-                    // --- THE DIRECTIONAL CHECK ---
+                    // --- OPTIONAL DIRECTIONAL CHECK ---
                     float3 entityPos = entityManager.GetComponentData<LocalTransform>(hitEntity).Position;
                     float3 toTarget = math.normalize(entityPos - (float3)transform.position);
-                    
-                    // If the angle is less than 180, check if they are in front of us
+
                     if (SlapAngle < 180f)
                     {
                         float dot = math.dot(transform.forward, toTarget);
-                        // Convert the angle to a dot product threshold (e.g., 90 degrees = 0 dot)
                         float angleThreshold = math.cos(math.radians(SlapAngle));
-                        
+
                         if (dot < angleThreshold)
                         {
-                            continue; // Skip this pedestrian, they are behind us!
+                            continue; // Behind us, ignore
                         }
                     }
-                    // -----------------------------
+                    // ---------------------------------
 
                     if (!entitiesInside.Contains(hitEntity))
                     {
@@ -97,7 +118,9 @@ namespace SlapGame
                                 HitDirection = hitDir,
                                 Force = SlapForce
                             });
-                            
+
+                            slapperController.Slap(slapSide);
+
                             Debug.DrawLine(transform.position, hit.Position, Color.green, 1f);
                         }
                     }
@@ -106,38 +129,46 @@ namespace SlapGame
 
             entitiesInside = currentFrameHits;
             hits.Dispose();
-            sphereCollider.Dispose();
+            boxCollider.Dispose();
         }
 
-        private void DrawDebugSphere(Vector3 center, float radius, Color color)
+        // -------- Helpers --------
+
+        private Vector3 GetBoxCenter()
         {
-            int segments = 20;
-            float angleStep = 360f / segments;
-            for (int i = 0; i < segments; i++)
-            {
-                float angle1 = i * angleStep * Mathf.Deg2Rad;
-                float angle2 = (i + 1) * angleStep * Mathf.Deg2Rad;
+            return transform.position + transform.TransformDirection(SlapBoxOffset);
+        }
 
-                Vector3 p1 = center + new Vector3(0, Mathf.Cos(angle1) * radius, Mathf.Sin(angle1) * radius);
-                Vector3 p2 = center + new Vector3(0, Mathf.Cos(angle2) * radius, Mathf.Sin(angle2) * radius);
-                Debug.DrawLine(p1, p2, color);
-
-                Vector3 p3 = center + new Vector3(Mathf.Cos(angle1) * radius, 0, Mathf.Sin(angle1) * radius);
-                Vector3 p4 = center + new Vector3(Mathf.Cos(angle2) * radius, 0, Mathf.Sin(angle2) * radius);
-                Debug.DrawLine(p3, p4, color);
-
-                Vector3 p5 = center + new Vector3(Mathf.Cos(angle1) * radius, Mathf.Sin(angle1) * radius, 0);
-                Vector3 p6 = center + new Vector3(Mathf.Cos(angle2) * radius, Mathf.Sin(angle2) * radius, 0);
-                Debug.DrawLine(p5, p6, color);
-            }
+        private quaternion GetBoxRotation()
+        {
+            Quaternion rot = transform.rotation * Quaternion.Euler(SlapBoxRotation);
+            return rot;
         }
 
         private void OnDrawGizmos()
         {
-            Gizmos.color = new Color(1f, 0f, 0f, 0.3f);
-            Gizmos.DrawSphere(transform.position, SlapRadius);
+            Gizmos.matrix = Matrix4x4.TRS(GetBoxCenter(), GetBoxRotation(), SlapBoxSize);
+
+            // Filled translucent box
+            Gizmos.color = new Color(1f, 0f, 0f, 0.2f);
+            Gizmos.DrawCube(Vector3.zero, Vector3.one);
+
+            // Wireframe box
             Gizmos.color = Color.red;
-            Gizmos.DrawWireSphere(transform.position, SlapRadius);
+            Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
+
+            // Reset matrix before drawing anything world-space
+            Gizmos.matrix = Matrix4x4.identity;
+
+            // Small forward indicator to show "front" of the box
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawRay(transform.position, transform.forward * 1f);
         }
+    }
+
+    public enum SlapSide : byte
+    {
+        Left,
+        Right
     }
 }

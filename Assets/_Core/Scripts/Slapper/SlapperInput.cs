@@ -4,7 +4,6 @@ using UnityEngine.InputSystem;
 
 public class SlapperInput : MonoBehaviour
 {
-    public event Action OnSlapPressed;
     // --- Movement State ---
     public Vector2 MoveInput { get; private set; }
     public bool HasMoveInput => MoveInput.sqrMagnitude > 0.01f;
@@ -41,7 +40,6 @@ public class SlapperInput : MonoBehaviour
         _input.Slapper.SlapHold.performed += ctx =>
         {
             IsSlapping = true;
-            OnSlapPressed?.Invoke();
         };
         _input.Slapper.SlapHold.canceled += ctx => IsSlapping = false;
     }

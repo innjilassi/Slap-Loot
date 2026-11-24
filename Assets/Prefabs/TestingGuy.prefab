@@ -845,8 +845,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Rukhanka.Hybrid::Rukhanka.Hybrid.OverrideTransformIKAuthoring
   target: {fileID: 1180790377997710616}
-  positionWeight: 1
-  rotationWeight: 1
+  positionWeight: 0
+  rotationWeight: 0
 --- !u!1 &2106510457663819695
 GameObject:
   m_ObjectHideFlags: 0
@@ -2615,7 +2615,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SlapGame.PedestrianAuthoring
   WanderRadius: 10
-  MaxHealth: 120
+  MaxHealth: 100
   IdleStates:
   - Name: Standing_Idle
     AnimationID: 0

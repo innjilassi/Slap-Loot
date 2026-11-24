@@ -1,5 +1,6 @@
 using UnityEngine;
-using Unity.Cinemachine; // Required for Cinemachine 3
+using Unity.Cinemachine;
+using SlapGame; // Required for Cinemachine 3
 
 [RequireComponent(typeof(CharacterController))]
 public class SlapperController : MonoBehaviour
@@ -24,6 +25,8 @@ public class SlapperController : MonoBehaviour
     public StateMachine StateMachine { get; private set; }
     private float _verticalVelocity;
 
+    
+
     private void Awake()
     {
         Controller = GetComponent<CharacterController>();
@@ -33,15 +36,6 @@ public class SlapperController : MonoBehaviour
         StateMachine = new StateMachine();
         StateMachine.Register(new IdleState(this));
         StateMachine.Register(new RunState(this));
-
-        ////
-        input.OnSlapPressed+=()=>
-        {
-            if(rSlap)
-                animHandler.SetTrigger("RSlap");
-            else
-                animHandler.SetTrigger("LSlap");
-        };
     }
 
     private void Start() => StateMachine.ChangeState<IdleState>();
@@ -51,7 +45,11 @@ public class SlapperController : MonoBehaviour
         StateMachine.Tick(Time.deltaTime);
         ApplyGravity();
     }
-
+    public void Slap(SlapSide slapSide)
+    {
+        if(slapSide == SlapSide.Left) animHandler.SetTrigger("LSlap");
+        else animHandler.SetTrigger("RSlap");
+    }
     private void ApplyGravity()
     {
         if (Controller.isGrounded && _verticalVelocity < 0f)
@@ -102,5 +100,10 @@ public class SlapperController : MonoBehaviour
         Vector3 forward = cinemachineCam.transform.forward;
         forward.y = 0f;
         return forward.normalized;
+    }
+
+    public bool GetIsSlapping()
+    {
+        return input.IsSlapping;
     }
 }
